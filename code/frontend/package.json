@@ -1,0 +1,25 @@
+{
+  "name": "xinghuo-app",
+  "version": "1.0.0",
+  "description": "星火 - 动起来，就有价值",
+  "private": true,
+  "scripts": {
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "dev:mp-weixin": "uni build -p mp-weixin --watch"
+  },
+  "dependencies": {
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "@dcloudio/uni-app": "3.0.0-alpha-5000920260512001",
+    "@dcloudio/uni-cli-shared": "3.0.0-alpha-5000920260512001",
+    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-5000920260512001",
+    "@dcloudio/uni-stat": "3.0.0-alpha-5000920260512001",
+    "@dcloudio/vite-plugin-uni": "^3.0.0-alpha-5000920260512001",
+    "sass": "^1.86.0",
+    "vite": "^6.3.2"
+  },
+  "uni-app": {
+    "scripts": {}
+  }
+}

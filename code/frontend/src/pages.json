@@ -1,0 +1,49 @@
+{
+  "pages": [
+    {"path": "pages/index/index", "style": {"navigationBarTitleText": "星火"}},
+    {"path": "pages/task/detail", "style": {"navigationBarTitleText": "任务详情"}},
+    {"path": "pages/order/list", "style": {"navigationBarTitleText": "我的任务"}},
+    {"path": "pages/order/detail", "style": {"navigationBarTitleText": "订单详情"}},
+    {"path": "pages/wallet/index", "style": {"navigationBarTitleText": "我的钱包"}},
+    {"path": "pages/profile/index", "style": {"navigationBarTitleText": "个人中心"}},
+    {"path": "pages/merchant/index", "style": {"navigationBarTitleText": "商户管理"}},
+    {"path": "pages/merchant/task-create", "style": {"navigationBarTitleText": "发布任务"}}
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "星火",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f5f5f5",
+    "onReachBottomDistance": 50
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#ff6b35",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "任务",
+        "iconPath": "static/tab/task.png",
+        "selectedIconPath": "static/tab/task-active.png"
+      },
+      {
+        "pagePath": "pages/order/list",
+        "text": "订单",
+        "iconPath": "static/tab/order.png",
+        "selectedIconPath": "static/tab/order-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "static/tab/profile.png",
+        "selectedIconPath": "static/tab/profile-active.png"
+      }
+    ]
+  },
+  "condition": {
+    "current": 0,
+    "list": []
+  }
+}
