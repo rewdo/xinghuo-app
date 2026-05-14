@@ -1,8 +1,5 @@
-// API 基础配置 - 可切换开发/生产环境
-// 开发环境：连接本地 Flask 后端
-// 生产环境：连接正式服务器
-
-const ENV = 'development' // 切换为 'production' 时使用正式地址
+// API 基础配置
+const ENV = 'development'
 
 const API_CONFIG = {
   development: {
@@ -10,8 +7,8 @@ const API_CONFIG = {
     name: '开发环境（本地）'
   },
   production: {
-    baseURL: 'https://xinghuo.tongshengwangluo.com/api/v1',
-    name: '生产环境（正式）'
+    baseURL: 'http://xinghuo.yiouxiaozhan.top/api/v1',
+    name: '生产环境（服务器）'
   }
 }
 
