@@ -14,7 +14,7 @@ app = Flask(__name__)
 CORS(app)
 
 # ===== 数据库连接（从环境变量读取，不留明文）=====
-DB_PASSWORD = os.environ.get('XINGHUO_DB_PASSWORD', 'c07a13ab48d414e6')
+DB_PASSWORD = os.environ.get('XINGHUO_DB_PASSWORD', '')  # 生产环境由 .env 提供
 
 DB_CONFIG = {
     'host': os.environ.get('XINGHUO_DB_HOST', '127.0.0.1'),
