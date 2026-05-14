@@ -1,36 +1,60 @@
-# 星火 APP — MVP 产品需求与架构设计
+# 星火 APP — MVP 产品需求与架构设计 v0.2
 
-> 版本: v0.1（MVP 骨架）
+> 版本: v0.2（融合训练匹配 + 三层奖励体系）
+> 日期: 2026-05-15
 > 前端: Uniapp（微信小程序优先，后续打包APP）
 > 后端: Python Flask + MySQL
 > 域名: xinghuo.tongshengwangluo.com
-> 设计原则: 先跑通全链路，再优化细节
+> 设计原则: 先跑通训练→任务匹配全链路，再优化细节
 
 ---
 
-## 一、MVP 功能范围
+## 一、核心定位（v0.2 修正）
 
-### 必须做（核心闭环，缺一不可）
+### 一句话定义
+> "你今天练什么，我们就给你派什么活；**每一项任务都是你的训练，每一次训练都有三种回报。**"
+
+### v0.1 问题 → v0.2 修正
+
+| 问题 | v0.1 状态 | v0.2 修正 |
+|------|----------|----------|
+| 任务像跑腿APP | 分类按配送/搬运/巡检 | 分类按跑步/步行/力量/爬楼/负重 |
+| 看不出锻炼价值 | 只有难度+耗时 | 显示预期消耗🔥+锻炼效果💪+等效步数 |
+| 单一奖励 | 只有金额+积分二选一 | 佣金+优惠券+积分三叠层 |
+| 用户用完即走 | 无留存机制 | 积分商城+连续正反馈 |
+
+---
+
+## 二、MVP 功能范围
+
+### 必须做（核心闭环）
 
 ```
-用户注册登录 → 浏览任务 → 接受任务 → 执行任务 → 完成确认 → 获得收益 → 提现
-                                                                        └→ 评价系统
+用户注册 → 设定训练计划 → 浏览匹配任务 → 接单执行 → 完成确认 → 三层奖励到账
+                                                                 └→ 评价系统
 ```
 
 | 模块 | 功能 | 说明 |
 |------|------|------|
 | **用户系统** | 微信授权一键登录 | 无需注册填表，降低门槛 |
-| | 用户基本信息 | 头像、昵称、手机号、体能标签 |
-| **任务系统** | 附近任务列表 | LBS 定位，按距离排序 |
-| | 任务详情 | 描述、酬金、距离、B端信息 |
+| | 训练计划设定 | 选择锻炼类型、频率、目标（减脂/增肌/耐力） |
+| | 个人数据看板 | 累计消耗🔥、完成单数、积分余额、等级 |
+| **任务系统** | 按训练计划推荐任务 | LBS + 匹配用户锻炼标签 |
+| | 全部任务（不筛选） | 不想按计划走时也可浏览所有 |
+| | 任务详情 | 锻炼消耗🔥+效果💪+三层奖励+描述+距离 |
 | | 接受/放弃任务 | 简单的状态切换 |
 | | 任务完成确认 | B端扫码/输入验证码确认 |
-| **结算系统** | 收益钱包 | 可查看总收益、待结算、已到账 |
+| **三层奖励系统** | 佣金到账（现金） | 可提现微信零钱 |
+| | 优惠券领取 | 商户券存入用户券包 |
+| | 平台积分到账 | 每单自动累计 |
+| **结算系统** | 收益钱包 | 佣金余额、明细 |
 | | 提现功能 | 微信零钱提现 |
-| | 交易记录 | 每条任务的收益记录 |
-| **B端管理台** | 发布任务 | 填写任务信息+酬金+位置 |
+| | 积分账户 | 积分余额、流水、消耗 |
+| | 积分商城 | 积分兑换实物/虚拟商品 |
+| **B端管理台** | 发布任务 | 填写描述 + 佣金 + 优惠券 + 锻炼分类 |
 | | 确认完成 | 扫码或手动确认 |
-| | 账户充值 | 先充值后发布 |
+| | 优惠券管理 | 创建/查看优惠券 |
+| | 账户充值 | 先充值后发布任务 |
 | **评价系统** | 五星评价 | 互评（B端评C端） |
 | | 评价展示 | 用户主页展示历史评价 |
 
@@ -38,187 +62,559 @@
 
 | 功能 | 理由 |
 |------|------|
-| 训练计划匹配算法 | MVP先手动浏览，后续AI匹配 |
-| 游戏化等级/成就系统 | 第二批迭代，先跑通商业模式 |
-| 权益/碳积分结算 | 只做现金结算，其他后面加 |
-| 组队任务/团队模式 | 用户量起来后再做 |
-| 英雄榜/排行榜 | 第二批迭代 |
+| AI自动匹配算法 | MVP用标签匹配+手动推荐，后续数据驱动 |
+| 社区PK/排行榜 | 用户量起来后再做 |
+| 手环/手机传感器校准消耗 | MVP用通用公式，后续接入 |
+| 积分兑换物流跟踪 | MVP手动发，后续系统化 |
 
 ---
 
-## 二、数据库核心表设计
+## 三、锻炼类型与任务匹配机制
+
+### 锻炼类型定义（fitness_tag）
+
+| 标签 | 名称 | 消耗算法 | 匹配任务示例 |
+|------|------|---------|-------------|
+| `run` | 跑步 | 体重(kg)×距离(km)×1.036 | 短距配送/文件递送 |
+| `walk` | 步行 | 步数×0.04 | 社区巡检/商户巡店 |
+| `lift` | 力量 | 时长(min)×5 | 搬运/卸货/搬运 |
+| `climb` | 爬楼 | 层数×5 | 楼层配送/上门服务 |
+| `carry` | 负重 | 距离(km)×体重×0.5 | 自行车配送/负重运输 |
+
+### 用户训练计划
+
+用户在注册/设定页面选择：
+
+1. **锻炼目标**：减脂 / 增肌 / 耐力 / 综合
+2. **频率**：每周2次 / 3次 / 5次 / 每天
+3. **首选锻炼类型**：跑步 / 步行 / 力量 / 爬楼 / 负重（可多选）
+4. **日均训练时长**：15min / 30min / 45min / 1h+
+
+系统据此为用户生成训练标签，匹配时：
+- 优先推荐 **全匹配**（锻炼类型命中且预估时长在计划范围内）
+- 其次 **部分匹配**（锻炼类型命中但时长偏差）
+- 最后 **其他任务**（用户可手动切换查看全部）
+
+### 消耗展示公式（前端自动计算）
+
+```
+跑步任务：
+  🔥 预期消耗 = 体重×距离×1.036
+  💪 锻炼效果 = 耐力+腿部
+  👣 等效步数 = 距离(km)×1250
+
+步行任务：
+  🔥 预期消耗 = 步数×0.04
+  💪 锻炼效果 = 有氧+腿部
+  👣 等效步数 = 步数
+
+爬楼任务：
+  🔥 预期消耗 = 楼层数×5
+  💪 锻炼效果 = 心肺+腿部
+  👣 等效步数 = 楼层×200
+
+力量任务：
+  🔥 预期消耗 = 时长(min)×5
+  💪 锻炼效果 = 核心+上肢
+  👣 等效步数 = 时长(min)×200
+
+负重任务：
+  🔥 预期消耗 = 距离×体重×0.5
+  💪 锻炼效果 = 全身+爆发力
+  👣 等效步数 = 距离(km)×1500
+```
+
+---
+
+## 四、数据库设计（v0.2 全面修订）
+
+### 4.1 用户表（users）— 追加字段
 
 ```sql
--- =============================================
--- 用户表（users）
--- =============================================
-CREATE TABLE users (
-  id              INT PRIMARY KEY AUTO_INCREMENT,
-  openid          VARCHAR(64) NOT NULL UNIQUE,     -- 微信openid
-  nickname        VARCHAR(64),
-  avatar_url      VARCHAR(256),
-  phone           VARCHAR(20),
-  gender          TINYINT DEFAULT 0,               -- 0未知 1男 2女
-  fitness_tags    VARCHAR(256),                    -- "跑步,爬楼,搬运" 逗号分隔
-  credit_score    INT DEFAULT 100,                 -- 信用分
-  total_earnings  DECIMAL(10,2) DEFAULT 0.00,      -- 累计收益
-  balance         DECIMAL(10,2) DEFAULT 0.00,      -- 当前余额
-  level           INT DEFAULT 1,                   -- 等级
-  status          TINYINT DEFAULT 1,               -- 1正常 0冻结
-  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_openid (openid),
-  INDEX idx_location (lat, lng)                    -- 后续用GIS扩展
-);
+-- 原有字段保留，追加：
+ALTER TABLE users ADD COLUMN
+  fitness_goal        VARCHAR(16) DEFAULT 'fat_loss',  -- 减脂/增肌/耐力/综合
+  fitness_frequency   TINYINT DEFAULT 3,               -- 每周训练次数
+  fitness_tags        JSON,                              -- ["run","walk"] 首选锻炼类型
+  daily_minutes       INT DEFAULT 30,                   -- 日均训练时长(分钟)
+  bio                 VARCHAR(256),                      -- 个人简介
+  total_tasks         INT DEFAULT 0,                     -- 历史完成单数
+  total_calories      INT DEFAULT 0;                     -- 累计消耗(大卡)
+```
 
--- =============================================
--- B端商户表（merchants）
--- =============================================
-CREATE TABLE merchants (
-  id                INT PRIMARY KEY AUTO_INCREMENT,
-  company_name      VARCHAR(128) NOT NULL,
-  contact_name      VARCHAR(32),
-  contact_phone     VARCHAR(20),
-  address           VARCHAR(256),
-  lat               DECIMAL(10,7),
-  lng               DECIMAL(10,7),
-  business_license  VARCHAR(256),                  -- 营业执照图片URL
-  balance           DECIMAL(10,2) DEFAULT 0.00,    -- 账户余额
-  status            TINYINT DEFAULT 0,             -- 0待审核 1正常 2冻结
-  created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+### 4.2 任务表（tasks）— 追加锻炼字段
 
--- =============================================
--- 任务表（tasks）
--- =============================================
-CREATE TABLE tasks (
-  id              INT PRIMARY KEY AUTO_INCREMENT,
-  merchant_id     INT NOT NULL,                    -- B端ID
-  title           VARCHAR(128) NOT NULL,           -- 任务标题
-  description     TEXT,                            -- 任务描述
-  task_type       TINYINT NOT NULL,                -- 1配送 2搬运 3巡检 4其他
-  reward_type     TINYINT DEFAULT 1,               -- 1现金 2权益 3积分
-  reward_amount   DECIMAL(10,2) DEFAULT 0.00,      -- 酬金（现金时为金额）
-  quantity        INT DEFAULT 1,                   -- 需要人数
-  accepted_count  INT DEFAULT 0,                   -- 已接单人数
-  status          TINYINT DEFAULT 0,               -- 0待接受 1进行中 2已完成 3已取消
-  address         VARCHAR(256),
-  lat             DECIMAL(10,7),
-  lng             DECIMAL(10,7),
-  difficulty      TINYINT DEFAULT 1,               -- 1轻松 2适中 3挑战
-  estimated_min   INT DEFAULT 15,                  -- 预计耗时(分钟)
-  expired_at      DATETIME,                        -- 过期时间
-  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  INDEX idx_status (status),
-  INDEX idx_location (lat, lng),
-  INDEX idx_merchant (merchant_id),
-  INDEX idx_type (task_type)
-);
+```sql
+ALTER TABLE tasks ADD COLUMN
+  fitness_tag         VARCHAR(16) NOT NULL DEFAULT 'walk',  -- 锻炼类型
+  muscle_group        VARCHAR(32),                          -- 锻炼部位
+  estimated_calories  SMALLINT DEFAULT 0,                   -- 预期消耗(大卡)
+  exercise_benefit    VARCHAR(64),                           -- 锻炼效果描述
+  steps_equivalent    INT DEFAULT 0;                         -- 等效步数
+```
 
--- =============================================
--- 任务接单表（task_orders）
--- =============================================
-CREATE TABLE task_orders (
-  id              INT PRIMARY KEY AUTO_INCREMENT,
-  task_id         INT NOT NULL,
-  user_id         INT NOT NULL,
-  status          TINYINT DEFAULT 0,               -- 0已接单 1执行中 2待确认 3已完成 4取消
-  accepted_at     DATETIME,                        -- 接单时间
-  completed_at    DATETIME,                        -- 完成时间
-  merchant_note   VARCHAR(256),                    -- B端备注
-  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_task_user (task_id, user_id),
-  INDEX idx_user (user_id),
-  INDEX idx_status (status)
-);
+### 4.3 任务奖励配置表（task_rewards）— 新增
 
--- =============================================
--- 评价表（reviews）
--- =============================================
-CREATE TABLE reviews (
-  id              INT PRIMARY KEY AUTO_INCREMENT,
-  order_id        INT NOT NULL UNIQUE,
-  rating          TINYINT NOT NULL,                -- 1-5星
-  comment         VARCHAR(512),
-  reviewer_type   TINYINT,                         -- 1B端评C端 2C端评B端
-  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+```sql
+CREATE TABLE task_rewards (
+  id                  INT PRIMARY KEY AUTO_INCREMENT,
+  task_id             INT NOT NULL UNIQUE,
+  -- 第一层：佣金（商家出）
+  commission_type     TINYINT DEFAULT 1,              -- 1固定金额 2阶梯
+  commission_amount   DECIMAL(10,2) DEFAULT 0.00,     -- 佣金金额
+  -- 第二层：优惠券（商家出）
+  coupon_set_id       INT DEFAULT NULL,               -- 关联优惠券组ID(可为空)
+  coupon_type         TINYINT DEFAULT 0,              -- 0无 1满减券 2折扣券 3实物券
+  coupon_desc         VARCHAR(128),                   -- 优惠描述
+  coupon_remain       INT DEFAULT 0,                  -- 剩余数量
+  -- 第三层：平台积分（平台出，每单必有）
+  platform_points     INT DEFAULT 10,                 -- 基础平台积分
+  -- 积分加成规则（系统计算，非手动填写）
+  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_task (task_id)
 );
+```
 
--- =============================================
--- 交易记录表（transactions）
--- =============================================
-CREATE TABLE transactions (
-  id              INT PRIMARY KEY AUTO_INCREMENT,
-  user_id         INT,
-  merchant_id     INT,
-  order_id        INT,
-  type            TINYINT,                         -- 1任务收入 2提现 3充值 4平台佣金
-  amount          DECIMAL(10,2) NOT NULL,
-  balance_before  DECIMAL(10,2),
-  balance_after   DECIMAL(10,2),
-  status          TINYINT DEFAULT 0,               -- 0处理中 1成功 2失败
-  remark          VARCHAR(256),
-  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_user (user_id),
+### 4.4 商户优惠券池（merchant_coupons）— 新增
+
+```sql
+CREATE TABLE merchant_coupons (
+  id                  INT PRIMARY KEY AUTO_INCREMENT,
+  merchant_id         INT NOT NULL,
+  coupon_name         VARCHAR(64),                    -- 券名称
+  coupon_type         TINYINT,                        -- 1满减 2折扣 3实物
+  coupon_desc         VARCHAR(256),                   -- 详情
+  rules               JSON,                           -- 规则: {"min_amount":20,"discount":5,"valid_days":30}
+  total               INT DEFAULT 0,                  -- 总发放数
+  remaining           INT DEFAULT 0,                  -- 剩余数
+  expire_at           DATETIME,
+  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_merchant (merchant_id)
 );
 ```
 
+### 4.5 用户奖励领取表（user_rewards）— 新增
+
+```sql
+CREATE TABLE user_rewards (
+  id                  INT PRIMARY KEY AUTO_INCREMENT,
+  order_id            INT NOT NULL,
+  user_id             INT NOT NULL,
+  commission_received DECIMAL(10,2) DEFAULT 0.00,    -- 佣金已到账
+  coupon_id           INT DEFAULT NULL,               -- 领取的优惠券ID
+  coupon_used         TINYINT DEFAULT 0,              -- 0未使用 1已使用 2已过期
+  points_received     INT DEFAULT 0,                  -- 获得的平台积分
+  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_user (user_id),
+  INDEX idx_order (order_id)
+);
+```
+
+### 4.6 用户积分表（user_points）— 新增
+
+```sql
+CREATE TABLE user_points (
+  id                  INT PRIMARY KEY AUTO_INCREMENT,
+  user_id             INT NOT NULL UNIQUE,
+  total_points        INT DEFAULT 0,                 -- 累计积分
+  current_points      INT DEFAULT 0,                 -- 可用积分
+  updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_user (user_id)
+);
+```
+
+### 4.7 积分流水表（point_transactions）— 新增
+
+```sql
+CREATE TABLE point_transactions (
+  id                  INT PRIMARY KEY AUTO_INCREMENT,
+  user_id             INT NOT NULL,
+  order_id            INT,                           -- 关联订单(收入时)
+  type                TINYINT,                       -- 1任务收入 2加成奖励 3兑换支出 4过期扣除 5推荐奖励
+  amount              INT NOT NULL,
+  balance_before      INT,
+  balance_after       INT,
+  remark              VARCHAR(256),
+  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_user (user_id)
+);
+```
+
+### 4.8 积分商城商品表（point_shop_items）— 新增
+
+```sql
+CREATE TABLE point_shop_items (
+  id                  INT PRIMARY KEY AUTO_INCREMENT,
+  name                VARCHAR(128) NOT NULL,          -- 商品名
+  description         TEXT,                           -- 商品描述
+  image_url           VARCHAR(256),                   -- 商品图
+  points_required     INT NOT NULL,                   -- 所需积分
+  stock               INT DEFAULT 0,                  -- 库存(0表示无限)
+  is_virtual          TINYINT DEFAULT 0,              -- 0实物 1虚拟(会员卡/兑换码)
+  status              TINYINT DEFAULT 1,              -- 1上架 0下架
+  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+### 4.9 积分兑换记录表（point_redemptions）— 新增
+
+```sql
+CREATE TABLE point_redemptions (
+  id                  INT PRIMARY KEY AUTO_INCREMENT,
+  user_id             INT NOT NULL,
+  item_id             INT NOT NULL,
+  points_spent        INT NOT NULL,
+  status              TINYINT DEFAULT 0,              -- 0处理中 1已发货 2已完成 3已取消
+  tracking_no         VARCHAR(64),                    -- 物流单号(实物)
+  address             VARCHAR(256),                   -- 收货地址
+  created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_user (user_id)
+);
+```
+
+### 4.10 原表修改总结
+
+| 表名 | 修改类型 | 说明 |
+|------|---------|------|
+| users | 追加字段 | 训练计划 + 生物数据 |
+| tasks | 追加字段 | 锻炼标签 + 消耗预估 |
+| task_orders | 追加字段 | 三层奖励到账记录 |
+| merchant_coupons | 新增 | 商家优惠券池 |
+| task_rewards | **新增** | 任务奖励配置 |
+| user_rewards | 新增 | 用户奖励领取记录 |
+| user_points | 新增 | 用户积分账户 |
+| point_transactions | 新增 | 积分流水 |
+| point_shop_items | 新增 | 积分商城商品 |
+| point_redemptions | 新增 | 积分兑换记录 |
+
 ---
 
-## 三、API 接口设计（核心）
+## 五、API 接口设计（v0.2 新增）
 
-### C端接口
-
-```
-POST  /api/v1/user/wxlogin          -- 微信登录（接收code，返回token）
-GET   /api/v1/user/profile           -- 获取用户信息
-PUT   /api/v1/user/profile           -- 更新用户信息（体能标签等）
-
-GET   /api/v1/tasks/nearby          -- 附近任务列表（lat,lng,radius）
-GET   /api/v1/tasks/:id              -- 任务详情
-POST  /api/v1/tasks/:id/accept       -- 接单
-POST  /api/v1/tasks/:id/cancel       -- 取消接单
-POST  /api/v1/tasks/:id/complete     -- 用户端点"已完成"
-
-GET   /api/v1/orders                 -- 我的任务列表（进行中/已完成）
-GET   /api/v1/orders/:id             -- 订单详情
-
-GET   /api/v1/wallet/balance         -- 钱包余额
-GET   /api/v1/wallet/transactions    -- 交易记录
-POST  /api/v1/wallet/withdraw        -- 提现到微信零钱
-
-POST  /api/v1/reviews                -- 提交评价
-```
-
-### B端接口
+### 5.1 C端新增接口
 
 ```
-POST  /api/v1/merchant/login        -- 商户登录（账号密码/扫码）
-POST  /api/v1/merchant/register     -- 商户注册（上传营业执照）
+# === 训练计划 ===
+POST   /api/v1/user/fitness-plan        -- 设定/更新训练计划
+GET    /api/v1/user/fitness-plan         -- 获取当前训练计划
+GET    /api/v1/user/fitness-stats        -- 个人消耗统计(总消耗、总单数)
 
-POST  /api/v1/tasks/create          -- 发布任务
-PUT   /api/v1/tasks/:id              -- 修改任务
-PUT   /api/v1/tasks/:id/close       -- 关闭任务（停止接单）
-GET   /api/v1/tasks/manage          -- 我的任务列表（含进行中数据）
+# === 按训练推荐任务 ===
+GET    /api/v1/tasks/recommended         -- 按用户训练计划推荐任务
+       ?lat=...&lng=...                  -- 响应包含: 预期消耗、锻炼效果、三层奖励
 
-POST  /api/v1/tasks/:id/confirm     -- 确认完成（扫码/手动）
+# === 三层奖励 ===
+GET    /api/v1/user/rewards              -- 我的奖励记录(佣金+券+积分)
+GET    /api/v1/wallet/balance            -- 佣金余额
+GET    /api/v1/wallet/transactions       -- 佣金交易记录
+POST   /api/v1/wallet/withdraw           -- 提现到微信零钱
 
-GET   /api/v1/merchant/wallet/balance      -- 商户余额
-POST  /api/v1/merchant/wallet/recharge     -- 充值
-GET   /api/v1/merchant/wallet/transactions -- 交易记录
+GET    /api/v1/points/balance            -- 积分余额
+GET    /api/v1/points/transactions       -- 积分流水
+GET    /api/v1/points/shop/items         -- 积分商城商品列表
+POST   /api/v1/points/shop/redeem        -- 兑换商品(item_id, address)
+
+# === 优惠券 ===
+GET    /api/v1/coupons                   -- 我的优惠券列表(未使用/已使用/已过期)
+GET    /api/v1/coupons/:id               -- 优惠券详情
+```
+
+### 5.2 B端新增接口
+
+```
+# === 优惠券管理 ===
+POST   /api/v1/merchant/coupons/create   -- 创建优惠券模板
+GET    /api/v1/merchant/coupons           -- 优惠券列表
+PUT    /api/v1/merchant/coupons/:id       -- 修改优惠券
+
+# === 发布任务（更新版） ===
+POST   /api/v1/tasks/create              -- 发布任务(含锻炼类型+奖励配置)
+       body: {
+         title, description,
+         fitness_tag,                    -- 锻炼类型(必选)
+         distance_meters,               -- 行走/跑步距离(影响消耗计算)
+         estimated_minutes,             -- 预计耗时
+         commission_amount,             -- 佣金金额(必填)
+         coupon_set_id,                 -- 优惠券组ID(可选)
+         platform_points               -- 平台积分(系统默认,可选覆盖)
+       }
+```
+
+### 5.3 任务详情响应格式（核心变更）
+
+```json
+{
+  "id": 1001,
+  "title": "帮王阿姨送菜",
+  "description": "从菜市场送到小区3号楼501",
+  "fitness_tag": "walk",
+  "fitness_benefit": {
+    "calories": 180,
+    "effect": "有氧+腿部",
+    "steps": 6000,
+    "duration_minutes": 30
+  },
+  "rewards": {
+    "commission": {
+      "type": "fixed",
+      "amount": 5.00
+    },
+    "coupon": {
+      "id": 201,
+      "name": "满20减5",
+      "description": "下次到店消费满20元减5元",
+      "remaining": 3
+    },
+    "points": {
+      "base": 50,
+      "bonus": 10,
+      "total": 60,
+      "bonus_reason": "连续7天活跃加成"
+    }
+  },
+  "merchant": {
+    "name": "老王水果店",
+    "address": "文明路15号"
+  },
+  "distance_meters": 800,
+  "status": "open",
+  "created_at": "2026-05-15T10:00:00"
+}
 ```
 
 ---
 
-## 四、技术架构
+## 六、三层奖励系统架构
+
+### 6.1 系统流转图
+
+```
+┌──────────────┐
+│  用户完成订单  │
+└──────┬───────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────┐
+│                订单完成事件（OrderCompleted）          │
+└──────┬──────────────────────┬──────────────────────┘
+       │                      │
+       ▼                      ▼
+┌─────────────────┐  ┌───────────────────────────────┐
+│  佣金处理        │  │  优惠券处理                    │
+│                  │  │                               │
+│  平台账户扣佣金  │  │  商户券剩余-1                 │
+│  平台抽佣10%    │  │  用户券包+1                   │
+│  用户钱包+90%   │  │  记录领取时间+有效期           │
+└─────────────────┘  └───────────────────────────────┘
+       │                      │
+       │                      │
+       ▼                      ▼
+┌─────────────────────────────────────────────────────┐
+│                平台积分处理                           │
+│                                                      │
+│  基础积分 = task_rewards.platform_points (默认50)    │
+│  + 加成积分：                                        │
+│    · 首单 +20%                                       │
+│    · 连续7天每天1单 +50%                              │
+│    · 获得5星评价 +30%                                 │
+│    · 当日训练计划达标 +40%                            │
+│                                                      │
+│  用户积分账户 += 基础+加成                            │
+│  积分流水记录                                         │
+└──────────────────────────────────────────────────────┘
+```
+
+### 6.2 积分消耗
+
+| 商品 | 所需积分 | 成本(预估) | 定位 |
+|------|---------|-----------|------|
+| Keep 周卡 | 300 | 虚拟~0元 | 入门消耗品 |
+| 运动毛巾 | 500 | ~15元 | 日常消耗品 |
+| 健身手套 | 1000 | ~30元 | 实用奖励 |
+| 运动水壶 | 1500 | ~25元 | 实用奖励 |
+| Keep 月卡 | 800 | 虚拟~0元 | 高频消耗品 |
+| 智能手环(基础款) | 5000 | ~80元 | 里程碑奖励 |
+| 品牌运动鞋 | 20000 | ~200元 | 终极激励 |
+
+### 6.3 积分获取示例（用户感知）
+
+```
+场景：用户小张，每天跑腿接单，已完成10单
+
+第1单： 基础50分 + 首单加成20%(10分) = 60分
+第2单： 基础50分 + 连续加成50%(25分，如已连7天) = 75分
+第3单： 基础50分 = 50分
+...
+
+完成10单可获得约 500-800 积分
+→ 可兑换：Keep周卡(300分) + 运动毛巾(500分)
+→ 正向反馈：成就感+实物奖励
+```
+
+---
+
+## 七、前端页面新增/修改
+
+### 7.1 首页（大改）
+
+```
+┌───────────────────────────────┐
+│  🏃 今日训练计划              │
+│  目标：减脂 · 每周3次          │
+│  推荐：跑步/步行               │
+├───────────────────────────────┤
+│                               │
+│  ┌─────────────────────────┐  │
+│  │  今日为你匹配的任务       │  │
+│  │                         │  │
+│  │  📮 巡检3家便利店       │  │
+│  │  🏷 步行锻炼             │  │
+│  │  🔥 消耗180大卡·6000步  │  │
+│  │  💰 5元 🎫满20减5 ⭐+50 │  │
+│  │  ─────────────────      │  │
+│  │  📦 帮王阿姨送菜         │  │
+│  │  🏷 跑步锻炼             │  │
+│  │  🔥 消耗220大卡·1.5km   │  │
+│  │  💰 8元 🎫打9折 ⭐+50   │  │
+│  │  ─────────────────      │  │
+│  │  📦 搬货到2楼仓库        │  │
+│  │  🏷 力量锻炼             │  │
+│  │  🔥 消耗150大卡·30min   │  │
+│  │  💰 12元 ⭐+50           │  │
+│  └─────────────────────────┘  │
+│                               │
+│  [ 切换训练类型 ] [ 全部任务 ]│
+│                               │
+│  底部Tab:                      │
+│  🏠首页  📋订单  👤我的       │
+└───────────────────────────────┘
+```
+
+### 7.2 任务详情页（大改）
+
+```
+┌───────────────────────────────┐
+│  ← 返回           📮 任务详情  │
+├───────────────────────────────┤
+│                               │
+│  📮 巡检3家便利店              │
+│  商户：老王超市（文明路15号）    │
+│                               │
+│  ┌──── 训练价值 ──────┐       │
+│  │ 🔥 消耗 180 大卡    │       │
+│  │ 💪 锻炼效果：有氧+腿 │       │
+│  │ 👣 等效：6000步     │       │
+│  │ ⏱ 预计：30分钟      │       │
+│  └────────────────────┘       │
+│                               │
+│  ┌──── 任务奖励 ──────┐       │
+│  │ 💰 佣金：5.00元(可提现)│     │
+│  │ 🎫 优惠券：满20减5   │       │
+│  │    剩余3张 · 7天有效 │       │
+│  │ ⭐ 平台积分：+50     │       │
+│  │    (连续7天活跃+25)  │       │
+│  └────────────────────┘       │
+│                               │
+│  任务描述：                     │
+│  从菜市场走到3家店巡货架        │
+│  路线：菜市场→老王超市→...    │
+│                               │
+│  🗺 [查看地图]                 │
+│                               │
+│  [       接单领任务       ]    │
+│                               │
+└───────────────────────────────┘
+```
+
+### 7.3 新增：积分/奖励中心页
+
+```
+┌───────────────────────────────┐
+│  ← 返回          ⭐ 积分中心    │
+├───────────────────────────────┤
+│                               │
+│  可用积分：1,350               │
+│  累计获得：2,800               │
+│                               │
+│  ┌──── 积分流水 ──────┐       │
+│  │ 今天 巡检便利店  +50 │       │
+│  │ 昨天 帮送文件    +50 │       │
+│  │ 昨天 连续7天加成 +25 │       │
+│  │ 前天 兑换运动毛巾 -500│       │
+│  └────────────────────┘       │
+│                               │
+│  ┌──── 积分商城 ──────┐       │
+│  │ 🧣 运动毛巾    500分│       │
+│  │ 🧤 健身手套   1000分│       │
+│  │ ⌚ 智能手环   5000分│       │
+│  │ 👟 运动鞋    20000分│       │
+│  │ 📱 Keep月卡   800分│       │
+│  └────────────────────┘       │
+│                               │
+├───────────────────────────────┤
+│  底部Tab:                      │
+│  🏠首页  📋订单  ⭐积分  👤我的 │
+└───────────────────────────────┘
+```
+
+### 7.4 新增：我的优惠券页
+
+```
+┌───────────────────────────────┐
+│  ← 返回          🎫 我的优惠券  │
+├───────────────────────────────┤
+│                               │
+│  ┌──── 未使用(3张) ────┐      │
+│  │ 🏪 老王水果店        │      │
+│  │    满20减5 · 7天有效 │      │
+│  │    (前往使用→)       │      │
+│  │ ─────────────────    │      │
+│  │ 🏪 小李超市          │      │
+│  │    全场9折 · 3天有效  │      │
+│  └────────────────────┘       │
+│                               │
+│  ┌──── 已使用/已过期 ──┐      │
+│  │ 🏪 王奶奶早餐店      │      │
+│  │    满15减3 · 已使用  │      │
+│  └────────────────────┘       │
+└───────────────────────────────┘
+```
+
+---
+
+## 八、任务发布流程（B端）
+
+```
+B端商户进入后台
+    │
+    ├── 填写基本信息：标题、描述、地址、位置
+    ├── 选择锻炼类型：跑步/步行/力量/爬楼/负重
+    ├── 填写距离/时长（系统自动算消耗🔥）
+    ├──
+    ├── 设定任务奖励：
+    │   ├─ 💰 佣金金额（必填，>0）
+    │   ├─ 🎫 优惠券（可选）
+    │   │   ├─ 选择已有券模板
+    │   │   └─ 创建新券（满减/折扣/实物）
+    │   └─ ⭐ 平台积分（系统自带50分，可选覆盖）
+    │
+    └── 发布 → 系统核对余额/券库存 → 上线
+```
+
+**B端发布页设计原则**：商户只填写"距离"和"佣金"，锻炼消耗由系统自动算，降低商户用门槛。
+
+---
+
+## 九、技术架构与开发顺序
+
+### 技术架构
 
 ```
 ┌─────────────────────────────────────────┐
-│           微信小程序（Uniapp）            │
-│           iOS/Android (Uniapp打包)        │
+│     微信小程序（Uniapp）                  │
+│     iOS/Android (Uniapp打包)              │
+│     - 首页 · 任务详情 · 积分商城 · 我的   │
 └────────────────┬────────────────────────┘
                  │ HTTPS
                  ▼
@@ -229,95 +625,55 @@ GET   /api/v1/merchant/wallet/transactions -- 交易记录
                  ▼
 ┌─────────────────────────────────────────┐
 │     Flask REST API + Redis 缓存          │
-│     - 用户认证（JWT Token）              │
-│     - 任务管理 CRUD                     │
-│     - 支付/提现（微信支付V3）            │
-│     - LBS 距离计算                      │
+│     - 训练匹配推荐算法                   │
+│     - 积分计算引擎（基础+加成）           │
+│     - 优惠券核销                         │
+│     - 消耗量自动计算公式                  │
 └────────────────┬────────────────────────┘
                  │
           ┌──────┴──────┐
           ▼              ▼
 ┌─────────────────┐ ┌─────────────────┐
 │   MySQL 8.0     │ │   Redis 7.x     │
-│   核心数据库    │ │   会话/缓存/队列 │
+│   10张+表       │ │   会话/缓存/队列 │
+│   含积分/券/兑换 │ │   LBS Geo模块   │
 └─────────────────┘ └─────────────────┘
 ```
 
-### 关键设计决策
-
-1. **为什么先做小程序不做APP？**
-   - 微信生态内0安装成本，裂变分享方便
-   - 微信支付直接对接，无需额外钱包
-   - 用户认证简单（openid登录）
-   - Uniapp 打包后直接转APP，不重写
-
-2. **为什么用 Flask + Redis？**
-   - 你熟悉 Python Flask，上手快
-   - Redis 做任务队列（接单并发控制）
-   - Redis 做 LBS 临近任务缓存（Geo模块）
-
-3. **提现方案**
-   - 企业付款到微信零钱（微信支付API）
-   - 需开通「商家转账到零钱」功能
-   - 单笔限额2000元，日限额10万（初始）
-
----
-
-## 五、支付与分账设计
-
-```
-用户完成订单
-    │
-    ▼
-B端确认完成
-    │
-    ├──→ 平台账户：扣除任务金额（进入平台账户）
-    │
-    ├──→ 平台佣金：任务金额 × 10%（平台收入）
-    │
-    └──→ 用户收益：任务金额 × 90%（进入用户钱包）
-            │
-            ▼
-        用户发起提现
-            │
-            ▼
-    企业付款到微信零钱
-```
-
-### 微信支付关键参数
-- 商户号：需申请微信支付商户号（企业资质）
-- 费率：微信支付0.6%（不可免）
-- 分账：可以用微信支付分账功能自动分账
-- 提现：企业付款到零钱接口，费率0.1%
-
----
-
-## 六、MVP 开发顺序（6周）
+### 开发顺序（6周 → 8周）
 
 ```
 第1-2周（搭建骨架）:
   ├── 项目初始化（Uniapp + Flask + MySQL）
-  ├── 用户注册/登录（微信授权）
-  ├── 附近任务列表页（LBS基础）
-  └── 任务详情页
+  ├── 用户注册/登录 + 训练计划设定
+  ├── 按训练推荐任务列表（基础LBS）
+  └── 任务详情页（含消耗展示+三层奖励展示）
 
 第3-4周（核心功能）:
   ├── 接单/完单流程
-  ├── B端管理台（发布任务+确认完成）
-  ├── 账户充值/结算
+  ├── B端管理台（含锻炼类型选择）
+  ├── 佣金结算+提现
+  ├── 商户优惠券创建
   └── 评价系统
 
-第5-6周（收尾+支付）:
+第5-6周（奖励系统）:
+  ├── 积分计算引擎（基础+加成规则）
+  ├── 用户积分账户+流水
+  ├── 积分商城+兑换
+  ├── 用户券包+核销
+  └── 积分消耗公式联动
+
+第7-8周（收尾+支付+上线）:
   ├── 微信支付对接
-  ├── 提现功能
-  ├── UI打磨
+  ├── UI打磨+统一体验
   ├── 小程序提审
+  ├── 积分商城初始商品上架
   └── 上线
 ```
 
 ---
 
-## 七、待办（需要你确认或提供的）
+## 十、待办清单（v0.2 新增）
 
 | # | 事项 | 备注 |
 |---|------|------|
@@ -326,3 +682,29 @@ B端确认完成
 | 3 | 微信支付商户号 | 申请后配置 |
 | 4 | 服务器环境 | 用哪台服务器？现有还是新购？ |
 | 5 | 地图服务商 | 高德还是腾讯地图？（LBS模块要用） |
+| 6 | 积分商城初期商品清单 | 需要确认采购预算 |
+| 7 | 积分基础值设定 | 默认50分/单，是否调整？ |
+| 8 | 优惠券商户接入策略 | 免费送券额度？先免费用起？ |
+
+---
+
+## 十一、版本变更记录
+
+| 版本 | 日期 | 变更内容 |
+|------|------|----------|
+| v0.1 | 2026-05-13 | 初版：跑腿平台骨架 |
+| **v0.2** | **2026-05-15** | **全面升级：锻炼类型匹配 + 消耗展示 + 三层奖励体系** |
+
+### v0.1 → v0.2 关键变更清单
+
+| 变更项 | 说明 |
+|--------|------|
+| 任务分类 | 配送/搬运/巡检 → 跑步/步行/力量/爬楼/负重 |
+| 任务卡片 | 标题+金额 → 锻炼标签+消耗🔥+效果💪+三层奖励 |
+| 首页 | 全部任务列表 → 按训练计划推荐 |
+| 奖励 | 单一金额 → 佣金+优惠券+平台积分三层叠 |
+| 积分系统 | 无 → 积分商城+连续加成+实物兑换 |
+| 数据库 | 5张表 → 10+张表（含积分/券/兑换） |
+| API | ~12个 → ~25个（含推荐/积分/券） |
+| 开发周期 | 6周 → 8周 |
+| 页面 | 3-4个 → 6-7个（含积分中心/券包） |
