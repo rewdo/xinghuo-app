@@ -2,7 +2,8 @@
 星火APP - Flask API 后端 v0.2
 数据库密码通过环境变量读取，不硬编码
 """
-from flask import Flask, jsonify, request, render_template_string
+from flask import Flask, jsonify, request, render_template_string, session, redirect
+from werkzeug.security import check_password_hash
 from flask_cors import CORS
 import pymysql
 import hashlib
@@ -11,7 +12,10 @@ import os
 from datetime import datetime
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
+
+# Flask session 密钥（从环境变量读取）
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # ===== 数据库连接（从环境变量读取，不留明文）=====
 DB_PASSWORD = os.environ.get('XINGHUO_DB_PASSWORD', '')  # 生产环境由 .env 提供
@@ -252,7 +256,163 @@ def shop_items():
     finally:
         db.close()
 
-# ===== 后台管理（管理员可直接改配置） =====
+# ===== 安全防护 =====
+# 所有 SQL 查询均使用参数化查询 (%%s 占位符)，杜绝 SQL 注入
+# 配置值输出时转义 HTML，杜绝 XSS
+import html as html_module
+
+def require_admin():
+    """检查管理员登录状态，未登录返回 False"""
+    return session.get('admin_logged_in') and session.get('admin_user')
+
+def sanitize(val):
+    """XSS 防护：转义 HTML 特殊字符"""
+    if val is None:
+        return ''
+    return html_module.escape(str(val))
+
+# ===== 管理员登录/登出 =====
+
+@app.route('/api/v1/admin/login', methods=['POST'])
+def admin_login():
+    data = request.json or {}
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({"code": 1, "msg": "用户名和密码不能为空"})
+    
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute("SELECT * FROM admin_users WHERE username = %s", (username,))
+            user = cur.fetchone()
+            if user and check_password_hash(user['password_hash'], password):
+                session['admin_logged_in'] = True
+                session['admin_user'] = username
+                session.permanent = True
+                # 更新最后登录时间
+                cur.execute("UPDATE admin_users SET last_login=NOW() WHERE id=%s", (user['id'],))
+                db.commit()
+                return jsonify({"code": 0, "msg": "ok", "data": {"username": username}})
+        return jsonify({"code": 1, "msg": "用户名或密码错误"})
+    finally:
+        db.close()
+
+@app.route('/api/v1/admin/logout', methods=['POST'])
+def admin_logout():
+    session.clear()
+    return jsonify({"code": 0, "msg": "已退出"})
+
+@app.route('/api/v1/admin/check')
+def admin_check():
+    if require_admin():
+        return jsonify({"code": 0, "data": {"username": session.get('admin_user')}})
+    return jsonify({"code": 401, "msg": "未登录"})
+
+# ===== 配置管理 API（需登录） =====
+
+@app.route('/api/v1/admin/config')
+def admin_config_list():
+    if not require_admin():
+        return jsonify({"code": 401, "msg": "请先登录"})
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute("SELECT * FROM system_config ORDER BY config_key")
+            rows = cur.fetchall()
+        return jsonify({"code": 0, "data": rows})
+    finally:
+        db.close()
+
+@app.route('/api/v1/admin/config/<key>', methods=['PUT'])
+def admin_config_update(key):
+    if not require_admin():
+        return jsonify({"code": 401, "msg": "请先登录"})
+    # 校验 key 格式（仅允许字母数字下划线，杜绝注入）
+    import re
+    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', key):
+        return jsonify({"code": 1, "msg": "参数名格式错误"})
+    data = request.json or {}
+    value = data.get('value', '')
+    # XSS 防护：转义 value（配置值不会包含 HTML）
+    safe_value = sanitize(str(value)[:500])  # 限制长度
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            # 参数化查询防止 SQL 注入
+            cur.execute("UPDATE system_config SET config_value=%s WHERE config_key=%s", (safe_value, key))
+            db.commit()
+            if cur.rowcount == 0:
+                return jsonify({"code": 1, "msg": "配置项不存在"})
+        return jsonify({"code": 0, "msg": "ok"})
+    finally:
+        db.close()
+
+# ===== 后台管理页面（带登录校验） =====
+
+LOGIN_PAGE = '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星火 后台登录</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+.login-box { background: #fff; border-radius: 16px; padding: 40px; width: 360px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+.logo { text-align: center; font-size: 28px; font-weight: bold; color: #333; margin-bottom: 8px; }
+.subtitle { text-align: center; font-size: 14px; color: #999; margin-bottom: 30px; }
+.input-group { margin-bottom: 20px; }
+.input-group label { display: block; font-size: 14px; color: #666; margin-bottom: 6px; }
+.input-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; transition: border-color 0.2s; }
+.input-group input:focus { outline: none; border-color: #667eea; }
+.login-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; transition: opacity 0.2s; }
+.login-btn:hover { opacity: 0.9; }
+.error { color: #f44336; font-size: 13px; text-align: center; margin-top: 12px; display: none; }
+</style>
+</head>
+<body>
+<div class="login-box">
+  <div class="logo">&#9881; 星火后台</div>
+  <div class="subtitle">管理系统</div>
+  <div class="input-group">
+    <label>用户名</label>
+    <input type="text" id="username" placeholder="请输入用户名" autocomplete="username" />
+  </div>
+  <div class="input-group">
+    <label>密码</label>
+    <input type="password" id="password" placeholder="请输入密码" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()" />
+  </div>
+  <button class="login-btn" onclick="login()">登 录</button>
+  <div class="error" id="error"></div>
+</div>
+<script>
+async function login() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
+  if (!username || !password) {
+    document.getElementById("error").textContent = "请输入用户名和密码";
+    document.getElementById("error").style.display = "block";
+    return;
+  }
+  const res = await fetch("/api/v1/admin/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username, password}),
+    credentials: "same-origin"
+  });
+  const data = await res.json();
+  if (data.code === 0) {
+    window.location.href = "/admin";
+  } else {
+    document.getElementById("error").textContent = data.msg || "登录失败";
+    document.getElementById("error").style.display = "block";
+  }
+}
+</script>
+</body>
+</html>'''
 
 ADMIN_HTML = '''<!DOCTYPE html>
 <html lang="zh-CN">
@@ -263,7 +423,10 @@ ADMIN_HTML = '''<!DOCTYPE html>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, sans-serif; background: #f5f5f5; padding: 20px; }
-h1 { font-size: 24px; color: #333; margin-bottom: 20px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+h1 { font-size: 24px; color: #333; }
+.logout-btn { font-size: 14px; color: #999; cursor: pointer; padding: 8px 16px; border-radius: 8px; border: 1px solid #ddd; background: #fff; }
+.logout-btn:hover { color: #f44336; border-color: #f44336; }
 .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .card-title { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 16px; }
 .row { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
@@ -279,19 +442,34 @@ h1 { font-size: 24px; color: #333; margin-bottom: 20px; }
 </style>
 </head>
 <body>
-<h1>⚙️ 星灯火 后台管理</h1>
+<div class="header">
+  <h1>&#9881; 星火 后台管理</h1>
+  <button class="logout-btn" onclick="logout()">退出登录</button>
+</div>
 <div id="app"></div>
 <div class="toast" id="toast">保存成功</div>
 <script>
 const API = "";
 let configs = [];
 
+async function checkLogin() {
+  const res = await fetch(API + "/api/v1/admin/check", {credentials: "same-origin"});
+  const data = await res.json();
+  if (data.code === 401) {
+    window.location.href = "/admin/login";
+    return false;
+  }
+  return true;
+}
+
 async function loadConfig() {
-  const res = await fetch(API + "/api/v1/admin/config");
+  const res = await fetch(API + "/api/v1/admin/config", {credentials: "same-origin"});
   const data = await res.json();
   if (data.code === 0) {
     configs = data.data;
     render();
+  } else if (data.code === 401) {
+    window.location.href = "/admin/login";
   }
 }
 
@@ -319,12 +497,18 @@ async function saveAll() {
   for (const cfg of configs) {
     const input = document.getElementById("input-" + cfg.config_key);
     if (input && input.value !== cfg.config_value) {
-      await fetch(API + "/api/v1/admin/config/" + cfg.config_key, {
+      const res = await fetch(API + "/api/v1/admin/config/" + cfg.config_key, {
         method: "PUT",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ value: input.value })
+        body: JSON.stringify({ value: input.value }),
+        credentials: "same-origin"
       });
-      cfg.config_value = input.value;
+      const data = await res.json();
+      if (data.code === 0) {
+        cfg.config_value = input.value;
+      } else if (data.code === 401) {
+        window.location.href = "/admin/login";
+      }
     }
   }
   const toast = document.getElementById("toast");
@@ -332,37 +516,27 @@ async function saveAll() {
   setTimeout(() => { toast.style.display = "none"; }, 2000);
 }
 
-loadConfig();
+async function logout() {
+  await fetch(API + "/api/v1/admin/logout", {method: "POST", credentials: "same-origin"});
+  window.location.href = "/admin/login";
+}
+
+checkLogin().then(ok => { if (ok) loadConfig(); });
 </script>
 </body>
 </html>'''
 
-@app.route('/api/v1/admin/config')
-def admin_config_list():
-    db = get_db()
-    try:
-        with db.cursor() as cur:
-            cur.execute("SELECT * FROM system_config ORDER BY config_key")
-            rows = cur.fetchall()
-        return jsonify({"code": 0, "data": rows})
-    finally:
-        db.close()
-
-@app.route('/api/v1/admin/config/<key>', methods=['PUT'])
-def admin_config_update(key):
-    data = request.json or {}
-    value = data.get('value', '')
-    db = get_db()
-    try:
-        with db.cursor() as cur:
-            cur.execute("UPDATE system_config SET config_value=%s WHERE config_key=%s", (value, key))
-            db.commit()
-        return jsonify({"code": 0, "msg": "ok"})
-    finally:
-        db.close()
+@app.route('/admin/login')
+def admin_login_page():
+    # 如果已登录，直接跳转到管理页
+    if require_admin():
+        return redirect('/admin')
+    return render_template_string(LOGIN_PAGE)
 
 @app.route('/admin')
-def admin_page():
+def admin_dashboard():
+    if not require_admin():
+        return redirect('/admin/login')
     return render_template_string(ADMIN_HTML)
 
 if __name__ == '__main__':
