@@ -2,7 +2,7 @@
 星火APP - Flask API 后端 v0.2
 数据库密码通过环境变量读取，不硬编码
 """
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template_string
 from flask_cors import CORS
 import pymysql
 import hashlib
@@ -251,6 +251,119 @@ def shop_items():
         return jsonify({"code": 0, "data": items})
     finally:
         db.close()
+
+# ===== 后台管理（管理员可直接改配置） =====
+
+ADMIN_HTML = '''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星火 后台管理</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, sans-serif; background: #f5f5f5; padding: 20px; }
+h1 { font-size: 24px; color: #333; margin-bottom: 20px; }
+.card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.card-title { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 16px; }
+.row { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+.row:last-child { border-bottom: none; }
+.key { width: 160px; font-size: 14px; color: #666; }
+.val { flex: 1; }
+.val input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+.val input:focus { outline: none; border-color: #ff6b35; }
+.desc { font-size: 12px; color: #999; margin-top: 4px; }
+.save-btn { background: #ff6b35; color: #fff; border: none; padding: 8px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.save-btn:hover { background: #e55a2b; }
+.toast { position: fixed; top: 20px; right: 20px; background: #4caf50; color: #fff; padding: 12px 24px; border-radius: 8px; font-size: 14px; display: none; z-index: 999; }
+</style>
+</head>
+<body>
+<h1>⚙️ 星灯火 后台管理</h1>
+<div id="app"></div>
+<div class="toast" id="toast">保存成功</div>
+<script>
+const API = "";
+let configs = [];
+
+async function loadConfig() {
+  const res = await fetch(API + "/api/v1/admin/config");
+  const data = await res.json();
+  if (data.code === 0) {
+    configs = data.data;
+    render();
+  }
+}
+
+function render() {
+  const groups = [
+    { title: "★ 积分设置", keys: ["points_base","points_bonus_first","points_bonus_streak","points_bonus_review","points_bonus_plan"] },
+    { title: "💰 佣金设置", keys: ["commission_rate","min_withdraw","max_daily_tasks"] },
+    { title: "📱 应用设置", keys: ["app_name","app_version"] }
+  ];
+  let html = "";
+  for (const g of groups) {
+    html += `<div class="card"><div class="card-title">${g.title}</div>`;
+    for (const key of g.keys) {
+      const cfg = configs.find(c => c.config_key === key);
+      if (!cfg) continue;
+      html += `<div class="row"><div class="key">${key}</div><div class="val"><input id="input-${key}" value="${cfg.config_value}" /><div class="desc">${cfg.description || ""}</div></div></div>`;
+    }
+    html += `</div>`;
+  }
+  html += `<div style="text-align:center;padding:10px"><button class="save-btn" onclick="saveAll()">保存全部</button></div>`;
+  document.getElementById("app").innerHTML = html;
+}
+
+async function saveAll() {
+  for (const cfg of configs) {
+    const input = document.getElementById("input-" + cfg.config_key);
+    if (input && input.value !== cfg.config_value) {
+      await fetch(API + "/api/v1/admin/config/" + cfg.config_key, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ value: input.value })
+      });
+      cfg.config_value = input.value;
+    }
+  }
+  const toast = document.getElementById("toast");
+  toast.style.display = "block";
+  setTimeout(() => { toast.style.display = "none"; }, 2000);
+}
+
+loadConfig();
+</script>
+</body>
+</html>'''
+
+@app.route('/api/v1/admin/config')
+def admin_config_list():
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute("SELECT * FROM system_config ORDER BY config_key")
+            rows = cur.fetchall()
+        return jsonify({"code": 0, "data": rows})
+    finally:
+        db.close()
+
+@app.route('/api/v1/admin/config/<key>', methods=['PUT'])
+def admin_config_update(key):
+    data = request.json or {}
+    value = data.get('value', '')
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute("UPDATE system_config SET config_value=%s WHERE config_key=%s", (value, key))
+            db.commit()
+        return jsonify({"code": 0, "msg": "ok"})
+    finally:
+        db.close()
+
+@app.route('/admin')
+def admin_page():
+    return render_template_string(ADMIN_HTML)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
