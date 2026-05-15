@@ -1,5 +1,5 @@
 // API 基础配置
-const ENV = 'development'
+const ENV = 'production'
 
 const API_CONFIG = {
   development: {
