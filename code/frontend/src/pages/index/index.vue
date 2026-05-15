@@ -144,7 +144,7 @@ export default {
 		async loadTasks() {
 			try {
 				const res = await uni.request({
-					url: 'http://localhost:5000/api/v1/tasks/recommended?user_id=1',
+					url: 'https://xinghuo.yiouxiaozhan.top/api/v1/tasks/recommended?user_id=1',
 					method: 'GET',
 					timeout: 3000
 				})
