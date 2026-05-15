@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view class="page">
 		<view class="nav-bar">
 			<text class="back-btn" @tap="goBack">‹ 返回</text>
@@ -104,7 +104,7 @@ export default {
 			try {
 				const res = await uni.request({
 					url: 'https://xinghuo.yiouxiaozhan.top/api/v1/tasks/' + id,
-					method: 'GET', timeout: 3000
+					method: 'GET', timeout: 2000
 				})
 				if (res.data && res.data.code === 0) { this.task = res.data.data; return }
 			} catch (e) {}

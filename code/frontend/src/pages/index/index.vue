@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view class="page">
 		<!-- 顶部训练计划卡片 -->
 		<view class="header-card">
@@ -146,7 +146,7 @@ export default {
 				const res = await uni.request({
 					url: 'https://xinghuo.yiouxiaozhan.top/api/v1/tasks/recommended?user_id=1',
 					method: 'GET',
-					timeout: 3000
+					timeout: 2000
 				})
 				if (res.data && res.data.code === 0 && res.data.data.length > 0) {
 					this.tasks = res.data.data
