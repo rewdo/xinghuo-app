@@ -1,187 +1,123 @@
 <template>
-	<view class="page-order-detail">
-		<view v-if="!order" class="loading-state">加载中...</view>
+	<view class="page">
+		<view class="nav-bar">
+			<text class="back-btn" @tap="goBack">‹ 返回</text>
+			<text class="nav-title">订单详情</text>
+			<text class="nav-placeholder"></text>
+		</view>
 
-		<template v-else>
-			<!-- 订单状态 -->
-			<view class="status-bar" :class="'status-' + order.status">
-				<text class="status-text">{{ statusLabels[order.status] }}</text>
-				<text class="status-hint">{{ statusHint }}</text>
-			</view>
+		<view class="status-banner" :class="'s' + (order.status || 0)">
+			<text class="status-icon">{{ STATUS_ICONS[order.status || 0] }}</text>
+			<text class="status-text">{{ STATUS_LABELS[order.status || 0] }}</text>
+		</view>
 
-			<!-- 任务信息 -->
-			<view class="info-card">
-				<text class="info-title">{{ order.task_title }}</text>
-				<text class="info-reward">¥{{ order.reward_amount }}</text>
+		<!-- 任务信息 -->
+		<view class="section">
+			<view class="section-title">📋 任务信息</view>
+			<text class="task-title">{{ order.title || '' }}</text>
+			<view class="task-tags">
+				<text class="tag">🔥 消耗{{ order.estimated_calories || 0 }}大卡</text>
+				<text class="tag">⏱ {{ order.estimated_min || 0 }}分钟</text>
 			</view>
+		</view>
 
-			<!-- 时间线 -->
-			<view class="timeline-card">
-				<view class="timeline-item">
-					<view class="dot"></view>
-					<view class="content">
-						<text class="content-title">接单</text>
-						<text class="content-time">{{ order.accepted_at }}</text>
-					</view>
-				</view>
-				<view class="timeline-item" v-if="order.completed_at">
-					<view class="dot done"></view>
-					<view class="content">
-						<text class="content-title">完成</text>
-						<text class="content-time">{{ order.completed_at }}</text>
-					</view>
-				</view>
+		<!-- 奖励明细 -->
+		<view class="section">
+			<view class="section-title">🎁 奖励明细</view>
+			<view class="reward-row" v-if="order.commission_received > 0">
+				<text class="rw-icon">💰</text>
+				<text class="rw-label">佣金到账</text>
+				<text class="rw-amount">+{{ order.commission_received }}元</text>
 			</view>
+			<view class="reward-row" v-if="order.points_received > 0">
+				<text class="rw-icon">⭐</text>
+				<text class="rw-label">平台积分</text>
+				<text class="rw-amount blue">+{{ order.points_received }}</text>
+			</view>
+			<view class="reward-row" v-if="order.coupon_desc">
+				<text class="rw-icon">🎫</text>
+				<text class="rw-label">商户优惠券</text>
+				<text class="rw-amount green">{{ order.coupon_desc }}</text>
+			</view>
+			<view v-else class="no-reward">
+				<text>暂无其他奖励</text>
+			</view>
+		</view>
 
-			<!-- 操作按钮 -->
-			<view class="buttons">
-				<button
-					v-if="order.status === 1"
-					class="btn-primary"
-					@tap="handleComplete"
-				>
-					标记已完成
-				</button>
-				<button
-					v-if="order.status === 0 || order.status === 1"
-					class="btn-danger"
-					@tap="handleCancel"
-				>
-					取消订单
-				</button>
+		<!-- 时间线 -->
+		<view class="section">
+			<view class="section-title">🕐 时间线</view>
+			<view class="timeline-item">
+				<text class="tl-time">{{ order.created_at || '-' }}</text>
+				<text class="tl-dot">●</text>
+				<text class="tl-text">接单</text>
 			</view>
-		</template>
+			<view class="timeline-item" v-if="order.completed_at">
+				<text class="tl-time">{{ order.completed_at }}</text>
+				<text class="tl-dot">●</text>
+				<text class="tl-text">完成</text>
+			</view>
+		</view>
 	</view>
 </template>
 
 <script>
-	import { getOrderDetail, completeOrder, cancelOrder } from '@/api/index.js'
-
-	export default {
-		data() {
-			return {
-				order: null,
-				statusLabels: { 0: '已接单', 1: '进行中', 2: '待确认', 3: '已完成', 4: '已取消' },
-				statusHint: ''
-			}
-		},
-		onLoad(options) {
-			if (options.id) this.loadOrder(options.id)
-		},
-		methods: {
-			loadOrder(id) {
-				getOrderDetail(id)
-					.then(data => {
-						this.order = data
-						this.statusHint = {
-							0: '前往任务地点开始执行', 1: '执行完成后等待商户确认',
-							2: '商户确认后将结算收益', 3: '收益已入账', 4: '任务已被取消'
-						}[data.status] || ''
-					})
-					.catch(() => {
-						uni.showToast({ title: '订单不存在', icon: 'none' })
-						setTimeout(() => uni.navigateBack(), 1000)
-					})
-			},
-			handleComplete() {
-				completeOrder(this.order.id)
-					.then(() => {
-						uni.showToast({ title: '已标记完成，等待商户确认', icon: 'success' })
-						this.loadOrder(this.order.id)
-					})
-					.catch(err => uni.showToast({ title: err.message, icon: 'none' }))
-			},
-			handleCancel() {
-				uni.showModal({
-					title: '提示',
-					content: '确定取消这个订单吗？',
-					success: (res) => {
-						if (res.confirm) {
-							cancelOrder(this.order.id)
-								.then(() => {
-									uni.showToast({ title: '已取消', icon: 'success' })
-									this.loadOrder(this.order.id)
-								})
-								.catch(err => uni.showToast({ title: err.message, icon: 'none' }))
-						}
-					}
-				})
+export default {
+	data() {
+		return {
+			order: {},
+			STATUS_LABELS: {0:'进行中',1:'执行中',2:'待确认',3:'已完成',4:'已取消'},
+			STATUS_ICONS: {0:'⏳',1:'🏃',2:'✅',3:'🎉',4:'🚫'},
+			demo: {
+				id:2, title:'帮王阿姨送菜', status:3,
+				estimated_calories:180, estimated_min:30,
+				commission_received:5.00, points_received:60,
+				coupon_desc:'满20减5',
+				created_at:'2026-05-14 15:20', completed_at:'2026-05-14 16:15'
 			}
 		}
+	},
+	onLoad(options) {
+		this.loadOrder(options.id)
+	},
+	methods: {
+		loadOrder(id) {
+			this.order = this.demo
+		},
+		goBack() { uni.navigateBack() }
 	}
+}
 </script>
 
 <style>
-	.page-order-detail { background: #f5f5f5; min-height: 100vh; }
+.page { min-height: 100vh; background: #f5f5f5; }
+.nav-bar { display: flex; align-items: center; padding: 60rpx 30rpx 20rpx; background: #fff; justify-content: space-between; }
+.back-btn { font-size: 28rpx; color: #ff6b35; }
+.nav-title { font-size: 28rpx; font-weight: bold; color: #333; }
+.nav-placeholder { width: 80rpx; }
 
-	.loading-state { text-align: center; padding-top: 300rpx; color: #999; }
+.status-banner { margin: 20rpx 30rpx; padding: 24rpx; border-radius: 16rpx; display: flex; align-items: center; }
+.s3 { background: #e8f5e9; }
+.status-icon { font-size: 40rpx; margin-right: 16rpx; }
+.status-text { font-size: 28rpx; font-weight: bold; color: #2e7d32; }
 
-	.status-bar {
-		padding: 40rpx 30rpx;
-		color: #fff;
-	}
-	.status-bar.status-0 { background: #1565c0; }
-	.status-bar.status-1 { background: var(--primary); }
-	.status-bar.status-2 { background: var(--warning); }
-	.status-bar.status-3 { background: var(--success); }
-	.status-bar.status-4 { background: #999; }
-	.status-text { font-size: 40rpx; font-weight: 700; display: block; }
-	.status-hint { font-size: 24rpx; opacity: 0.8; margin-top: 8rpx; display: block; }
+.section { background: #fff; margin: 20rpx 30rpx; padding: 30rpx; border-radius: 16rpx; }
+.section-title { font-size: 26rpx; font-weight: bold; color: #333; margin-bottom: 16rpx; }
+.task-title { font-size: 32rpx; font-weight: bold; color: #333; display: block; margin-bottom: 12rpx; }
+.task-tags { display: flex; gap: 12rpx; }
+.tag { font-size: 22rpx; color: #ff6b35; background: #fff8f0; padding: 6rpx 16rpx; border-radius: 20rpx; }
 
-	.info-card {
-		background: #fff;
-		margin: 30rpx;
-		padding: 30rpx;
-		border-radius: 16rpx;
-	}
-	.info-title { font-size: 32rpx; font-weight: 600; display: block; margin-bottom: 16rpx; }
-	.info-reward { font-size: 48rpx; font-weight: 700; color: var(--primary); }
+.reward-row { display: flex; align-items: center; padding: 16rpx 0; border-bottom: 1rpx solid #f5f5f5; }
+.reward-row:last-child { border-bottom: none; }
+.rw-icon { font-size: 32rpx; margin-right: 16rpx; }
+.rw-label { flex: 1; font-size: 26rpx; color: #333; }
+.rw-amount { font-size: 28rpx; font-weight: bold; color: #e6a817; }
+.blue { color: #2196f3; }
+.green { color: #4caf50; }
+.no-reward { font-size: 24rpx; color: #ccc; padding: 10rpx 0; }
 
-	.timeline-card {
-		background: #fff;
-		margin: 0 30rpx 30rpx;
-		padding: 30rpx;
-		border-radius: 16rpx;
-	}
-	.timeline-item {
-		display: flex;
-		align-items: flex-start;
-		padding: 16rpx 0;
-		position: relative;
-	}
-	.dot {
-		width: 20rpx;
-		height: 20rpx;
-		border-radius: 50%;
-		background: var(--primary);
-		margin-right: 16rpx;
-		margin-top: 8rpx;
-		flex-shrink: 0;
-	}
-	.dot.done { background: var(--success); }
-	.content-title { font-size: 28rpx; color: #333; display: block; }
-	.content-time { font-size: 22rpx; color: #999; display: block; margin-top: 4rpx; }
-
-	.buttons { padding: 0 30rpx; }
-	.btn-primary {
-		width: 100%;
-		height: 88rpx;
-		line-height: 88rpx;
-		background: var(--primary);
-		color: #fff;
-		border-radius: 44rpx;
-		font-size: 30rpx;
-		border: none;
-		margin-bottom: 16rpx;
-	}
-	.btn-danger {
-		width: 100%;
-		height: 80rpx;
-		line-height: 80rpx;
-		background: #fff;
-		color: var(--danger);
-		border-radius: 40rpx;
-		font-size: 28rpx;
-		border: 2rpx solid var(--danger);
-	}
+.timeline-item { display: flex; align-items: center; padding: 12rpx 0; }
+.tl-time { width: 160rpx; font-size: 22rpx; color: #999; }
+.tl-dot { font-size: 18rpx; color: #ff6b35; margin: 0 16rpx; }
+.tl-text { font-size: 24rpx; color: #333; }
 </style>
