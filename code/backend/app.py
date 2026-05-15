@@ -1,5 +1,5 @@
-"""
-星火APP - Flask API 后端 v0.2
+﻿"""
+零星共成APP - Flask API 后端 v0.2
 数据库密码通过环境变量读取，不硬编码
 """
 from flask import Flask, jsonify, request, render_template_string, session, redirect
@@ -356,7 +356,7 @@ LOGIN_PAGE = '''<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>星火 后台登录</title>
+<title>零星共成 后台登录</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
@@ -374,7 +374,7 @@ body { font-family: -apple-system, sans-serif; background: linear-gradient(135de
 </head>
 <body>
 <div class="login-box">
-  <div class="logo">&#9881; 星火后台</div>
+  <div class="logo">&#9881; 零星共成后台</div>
   <div class="subtitle">管理系统</div>
   <div class="input-group">
     <label>用户名</label>
@@ -419,7 +419,7 @@ ADMIN_HTML = '''<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>星火 后台管理</title>
+<title>零星共成 后台管理</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, sans-serif; background: #f5f5f5; padding: 20px; }
@@ -443,7 +443,7 @@ h1 { font-size: 24px; color: #333; }
 </head>
 <body>
 <div class="header">
-  <h1>&#9881; 星火 后台管理</h1>
+  <h1>&#9881; 零星共成 后台管理</h1>
   <button class="logout-btn" onclick="logout()">退出登录</button>
 </div>
 <div id="app"></div>

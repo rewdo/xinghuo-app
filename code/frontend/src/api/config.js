@@ -7,7 +7,7 @@ const API_CONFIG = {
     name: '开发环境（本地）'
   },
   production: {
-    baseURL: 'http://xinghuo.yiouxiaozhan.top/api/v1',
+    baseURL: 'https://xinghuo.yiouxiaozhan.top/api/v1',
     name: '生产环境（服务器）'
   }
 }
